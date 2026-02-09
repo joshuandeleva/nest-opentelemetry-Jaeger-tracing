@@ -45,23 +45,32 @@ import { PaymentsModule } from './payments/payments.module';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('database.url'),
-        retryWrites: true,
-        w: 'majority',
-        connectionFactory: (connection: Connection) => {
-          connection.on('connected', () => {
-            console.log('MongoDB connected successfully');
-          });
-          connection.on('disconnected', () => {
-            console.log('MongoDB disconnected');
-          });
-          connection.on('error', (error) => {
-            console.error('MongoDB connection error:', error);
-          });
-          return connection;
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const uri = configService.get<string>('database.url');
+        if (!uri) {
+          throw new Error('MONGO_URL environment variable is not defined');
+        }
+        return {
+          uri,
+          retryWrites: true,
+          w: 'majority',
+          serverSelectionTimeoutMS: 5000,
+          connectTimeoutMS: 10000,
+          connectionFactory: (connection: Connection) => {
+            connection.on('connected', () => {
+              console.log('MongoDB connected successfully');
+            });
+            connection.on('disconnected', () => {
+              console.log('MongoDB disconnected');
+            });
+            connection.on('error', (error) => {
+              console.error('MongoDB connection error:', error);
+              throw error;
+            });
+            return connection;
+          },
+        };
+      },
     }),
 
     PaymentsModule,
